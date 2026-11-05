@@ -1,38 +1,54 @@
 # Macast-Mac
 
-MyCast 是用 Swift 和 AppKit 编写的 macOS 菜单栏 DLNA 接收器，参考了 [Macast](https://github.com/xfangfang/Macast) 的设备发现、控制接口和播放流程。需要 macOS 13 或更高版本。
+English | [简体中文](README.zh-CN.md)
 
-## 构建和使用
+MyCast is a macOS menu bar DLNA receiver written in Swift with AppKit. It requires macOS 13 or later. Its device discovery and playback controls are based on [Macast](https://github.com/xfangfang/Macast).
 
-在 [GitHub Releases](https://github.com/tanrenye/Macast-Mac/releases) 下载通用 DMG。打开磁盘映像，把 MyCast 拖到 Applications。该安装包包含 Apple 芯片和 Intel 两种架构，使用本地签名，未经过 Apple 公证。
+## Install
 
-安装 Xcode Command Line Tools 或 Xcode 后，在仓库根目录执行：
+Download the universal DMG from [GitHub Releases](https://github.com/tanrenye/Macast-Mac/releases). Open the disk image and drag MyCast into Applications. The DMG supports both Apple silicon and Intel Macs. The app is ad hoc signed and has no Apple notarization.
+
+To build from source, install the Xcode Command Line Tools or Xcode, then run these commands from the repository root.
 
 ```sh
 ./scripts/build-app.sh
 open dist/MyCast.app
 ```
 
-把手机和 Mac 连到同一个局域网。打开 MyCast，在手机播放器的 **DLNA 投屏** 列表中选择 **MyCast（电脑名称）**。如果 macOS 弹出本地网络权限提示，允许后重新搜索。菜单栏可以暂停接收、查看监听端口、复制媒体链接和修改设备名。
+The build script produces an ad hoc signed app for the current architecture. For distribution with Apple notarization, sign the app with a Developer ID certificate and submit it for notarization.
 
-默认优先使用已安装的 mpv，没有 mpv 时使用 macOS 系统播放器。可以从菜单中切换到 **IINA** 或固定选用某个播放器。MyCast 会在 Homebrew、MacPorts 和 PATH 中查找 mpv，在系统及用户的 Applications 文件夹中查找 IINA。系统播放器的格式范围取决于 AVFoundation。需要 MKV 等更多格式时可以安装 mpv。使用 mpv 时，在菜单中打开配置目录，然后在其中的 `mpv` 目录放置 `mpv.conf` 或 `input.conf`。
+## Cast to your Mac
 
-设备名、端口、网卡排除规则、音量、窗口大小、位置和置顶等设置会保存。端口设为 `0` 时由系统分配，实际端口显示在菜单栏。需要登录后自动运行时，将应用移动到 Applications 文件夹，再从菜单中启用 **登录时启动**。
+Connect your phone and Mac to the same local network. Open MyCast, then select **MyCast (computer name)** from the DLNA casting list in your phone's media player. If macOS asks for local network access, allow it and search again.
 
-手机搜不到时，打开 **发现诊断 → 复制手机检测地址**，在手机浏览器打开该地址。能看到设备 XML 表示手机可以访问接收器的 HTTP 端口。回到手机 App 再搜一次，然后查看 **发现诊断** 是否记录了这次 SSDP 搜索和应答。也可以在 Mac 的 **系统设置 → 隐私与安全性 → 本地网络** 查看 MyCast 的权限。本地签名的应用重建后，macOS 可能需要刷新授权缓存。如果权限已开启，但诊断显示 SSDP 发包时「无到主机的路由」，请从菜单栏退出 MyCast，再重新打开应用。
+Use the menu bar icon to start or stop receiving casts, see the listening port, copy the current media link, or change the device name in Settings.
 
-## 命令行
+### Playback and settings
+
+In automatic mode, MyCast prefers mpv when available and falls back to the built-in macOS player. Use the player menu (**播放器**) to select IINA or choose a specific player. MyCast looks for mpv in its app bundle, in standard Homebrew and MacPorts locations, and on `PATH`. It looks for IINA in `/Applications` and `~/Applications`. The built-in player supports the formats AVFoundation can play. Install mpv for additional formats such as MKV.
+
+To customize mpv, select **Open Configuration Folder (打开配置目录)** and put `mpv.conf` or `input.conf` in the `mpv` subfolder.
+
+MyCast saves settings such as the device name, port, network interface exclusions, volume, window size and position, and whether the player window stays on top. Set the port to `0` to let macOS assign one. Open the MyCast menu to see the active port. To launch MyCast automatically at login, move it to Applications and enable **Launch at Login (登录时启动)** from the menu.
+
+### Troubleshoot discovery
+
+If your phone cannot find MyCast, choose **Discovery Diagnostics (发现诊断) → Copy Phone Test Address (复制手机检测地址)** and open the address in your phone's browser. If the device description XML loads, the phone can reach the receiver's HTTP port. Search again in the phone app and check the diagnostics menu to see whether MyCast received and answered the SSDP search.
+
+You can check MyCast's local network permission in **System Settings → Privacy & Security → Local Network**. After rebuilding an ad hoc signed app, macOS may need to refresh its cached permission. If access is enabled but the SSDP diagnostics report “No route to host,” quit MyCast from the menu bar and reopen it.
+
+## Command line
 
 ```sh
-swift run MyCast --headless --name "客厅 Mac" --port 1068 --player system
+swift run MyCast --headless --name "Living Room Mac" --port 1068 --player system
 ```
 
-`--headless` 隐藏菜单栏图标，收到投屏时仍会调用所选播放器。选项也适用于 `dist/MyCast.app/Contents/MacOS/MyCast`。
+`--headless` hides the menu bar icon. Incoming casts still open in the selected player. The same options work with `dist/MyCast.app/Contents/MacOS/MyCast`.
 
-## 功能范围
+## Features
 
-- IPv4 多网卡 SSDP 搜索及设备广播，网络变化时自动刷新。
-- DLNA AVTransport、RenderingControl、ConnectionManager 和 GENA，支持视频、音频和图片投放，以及播放、暂停、停止、进度、音量、静音和下一条媒体。
-- 原生设置、菜单栏状态、复制投屏链接、登录启动，以及 mpv 和 IINA 的播放控制。
-- 原版的 Python 插件加载和插件商店、哔哩必连（NVA）私有协议及弹幕、原版更新检查，以及 Windows 和 Linux 版本目前未移植。IINA 已在 Swift 版中直接集成。
-- 构建脚本输出当前架构的本地签名应用。用于分发时需另行完成 Developer ID 签名及公证。
+- IPv4 SSDP discovery and device announcements across multiple network interfaces, with automatic refresh when the network changes.
+- DLNA AVTransport, RenderingControl, ConnectionManager, and GENA for casting video, audio, and images. Controls cover play, pause, stop, seeking, volume, mute, and advancing to the next item.
+- Native settings, menu bar status, media link copying, launch at login, and playback controls for mpv and IINA.
+
+The Swift port integrates IINA directly. The original project's Python plugin loader and plugin store, proprietary Bilibili casting protocol (NVA) and on-screen comments, update checker, and Windows and Linux versions are outside the current scope.
