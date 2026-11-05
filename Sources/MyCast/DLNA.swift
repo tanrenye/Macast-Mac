@@ -221,7 +221,7 @@ final class DLNA {
     let settings: Settings
     private let events = GENA()
     private let logger = Logger(subsystem: "local.mycast.receiver", category: "DLNA")
-    private(set) var lastAction: String?
+    private(set) var lastAction: AppMessage?
     private var eventSnapshot: [DLNAService: String] = [:]
     private var serviceDocuments: [DLNAService: String] = [:]
 
@@ -308,14 +308,14 @@ final class DLNA {
             if let channel = args["Channel"], channel != "Master" { throw SOAPError(402, "Invalid Channel") }
             let values = try execute(action.name, args: args)
             if ["SetAVTransportURI", "SetNextAVTransportURI", "Play", "Pause", "Stop", "Seek"].contains(action.name) {
-                lastAction = "\(action.name) · 已接收"
+                lastAction = AppMessage("\(action.name) · Received", "\(action.name) · 已接收")
                 logger.notice("\(action.name, privacy: .public) accepted")
             }
             let output = definition.output.map { "<\($0)>\((values[$0] ?? "").xml)</\($0)>" }.joined()
             return envelope("<u:\(action.name)Response xmlns:u=\"\(service.urn)\">\(output)</u:\(action.name)Response>")
         } catch {
             let fault = error as? SOAPError ?? SOAPError(501, "Action Failed")
-            lastAction = "\(actionName) · UPnP \(fault.code) \(fault.message)"
+            lastAction = AppMessage("\(actionName) · UPnP \(fault.code) \(fault.message)")
             logger.error("\(actionName, privacy: .public) rejected: UPnP \(fault.code) \(fault.message, privacy: .public)")
             return envelope("""
             <s:Fault><faultcode>s:Client</faultcode><faultstring>UPnPError</faultstring>

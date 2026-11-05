@@ -35,10 +35,10 @@ enum TransportState: String {
 enum PlayerKind: String, CaseIterable {
     case automatic, system, mpv, iina
 
-    var title: String {
+    func title(in language: AppLanguage) -> String {
         switch self {
-        case .automatic: return "自动（优先 mpv）"
-        case .system: return "系统播放器"
+        case .automatic: return language.text("Automatic (prefer mpv)", "自动（优先 mpv）")
+        case .system: return language.text("System Player", "系统播放器")
         case .mpv: return "mpv"
         case .iina: return "IINA"
         }
@@ -63,7 +63,10 @@ enum PlayerKind: String, CaseIterable {
 enum PlayerSize: Int, CaseIterable {
     case small, normal, large, automatic, fullScreen
 
-    static let labels = ["小窗口", "普通", "大窗口", "自动", "全屏"]
+    static func labels(in language: AppLanguage) -> [String] {
+        language == .english ? ["Small", "Normal", "Large", "Automatic", "Full Screen"] :
+            ["小窗口", "普通", "大窗口", "自动", "全屏"]
+    }
 
     var scale: Double {
         switch self {
@@ -78,7 +81,10 @@ enum PlayerSize: Int, CaseIterable {
 enum PlayerPosition: Int, CaseIterable {
     case topLeft, bottomLeft, topRight, bottomRight, center
 
-    static let labels = ["左上", "左下", "右上", "右下", "居中"]
+    static func labels(in language: AppLanguage) -> [String] {
+        language == .english ? ["Top Left", "Bottom Left", "Top Right", "Bottom Right", "Center"] :
+            ["左上", "左下", "右上", "右下", "居中"]
+    }
 
     var mpvGeometry: String {
         switch self {
@@ -106,7 +112,7 @@ enum PlayerPosition: Int, CaseIterable {
 }
 
 enum PlayerEvent {
-    case playing, paused, ended, error(String), position(Double), duration(Double), volume(Int), mute(Bool), speed(Double)
+    case playing, paused, ended, error(AppMessage), position(Double), duration(Double), volume(Int), mute(Bool), speed(Double)
 }
 
 protocol PlayerBackend: AnyObject {
@@ -133,7 +139,7 @@ final class Playback {
     private(set) var volume: Int
     private(set) var muted = false
     var onChange: (() -> Void)?
-    var onError: ((String) -> Void)?
+    var onError: ((AppMessage) -> Void)?
 
     init(settings: Settings) {
         self.settings = settings
@@ -165,7 +171,8 @@ final class Playback {
         } else if kind == .automatic || kind == .system {
             player = SystemPlayer()
         } else {
-            fail("找不到 \(kind.title)，请安装后重试。")
+            fail(AppMessage("Could not find \(kind.title(in: .english)). Install it and try again.",
+                            "找不到 \(kind.title(in: .simplifiedChinese))，请安装后重试。"))
             return
         }
 
@@ -182,7 +189,7 @@ final class Playback {
             player.volume(volume, muted: muted)
             player.play(speed: speed)
         } catch {
-            fail(error.localizedDescription)
+            fail(AppMessage(error.localizedDescription))
         }
     }
 
@@ -229,7 +236,7 @@ final class Playback {
         play()
     }
 
-    private func fail(_ message: String) {
+    private func fail(_ message: AppMessage) {
         stop()
         status = "ERROR_OCCURRED"
         onChange?()
@@ -297,7 +304,7 @@ final class SystemPlayer: NSObject, PlayerBackend, NSWindowDelegate {
                 DispatchQueue.main.async { [weak self, weak view] in
                     guard let self, let view, self.window != nil else { return }
                     guard let data, let image = NSImage(data: data), image.isValid else {
-                        onEvent?(.error("图片加载失败。"))
+                        onEvent?(.error(AppMessage("Could not load the image.", "图片加载失败。")))
                         return
                     }
                     view.image = image
@@ -334,7 +341,10 @@ final class SystemPlayer: NSObject, PlayerBackend, NSWindowDelegate {
                         if initialPosition > 0 { seek(initialPosition) }
                         self.player?.rate = requestedRate
                         onEvent?(requestedRate == 0 ? .paused : .playing)
-                    case .failed: onEvent?(.error(item.error?.localizedDescription ?? "媒体无法播放。"))
+                    case .failed:
+                        let message = item.error.map { AppMessage($0.localizedDescription) } ??
+                            AppMessage("The media could not be played.", "媒体无法播放。")
+                        onEvent?(.error(message))
                     default: break
                     }
                 }
@@ -387,7 +397,9 @@ final class SystemPlayer: NSObject, PlayerBackend, NSWindowDelegate {
             center.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) {
                 [weak self] note in
                 let error = note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
-                self?.onEvent?(.error(error?.localizedDescription ?? "播放中断。"))
+                let message = error.map { AppMessage($0.localizedDescription) } ??
+                    AppMessage("Playback was interrupted.", "播放中断。")
+                self?.onEvent?(.error(message))
             }
         ]
     }

@@ -29,6 +29,10 @@ final class Settings {
         get { playerOverride ?? PlayerKind(rawValue: defaults.string(forKey: "player") ?? "") ?? .automatic }
         set { playerOverride = nil; defaults.set(newValue.rawValue, forKey: "player") }
     }
+    var language: AppLanguage {
+        get { defaults.string(forKey: "language").flatMap(AppLanguage.init(rawValue:)) ?? .preferred }
+        set { defaults.set(newValue.rawValue, forKey: "language") }
+    }
     var blocked: Set<String> {
         get { Set(defaults.stringArray(forKey: "blocked") ?? []) }
         set { defaults.set(newValue.sorted(), forKey: "blocked") }
@@ -73,7 +77,7 @@ final class CastApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var http: HTTPServer?
     private var ssdp: SSDP?
     private var currentPort: UInt16?
-    private var playbackError: String?
+    private var playbackError: AppMessage?
     private var statusItem: NSStatusItem?
     private var preferencesWindow: PreferencesWindow?
     private var stoppingSignals: [DispatchSourceSignal] = []
@@ -91,9 +95,11 @@ final class CastApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             dlna.publishChanges()
         }
         playback.onError = { [weak self] message in
-            self?.log(message)
-            self?.playbackError = message
-            self?.playbackLogger.error("Playback failed: \(message, privacy: .private)")
+            guard let self else { return }
+            let detail = message.text(in: settings.language)
+            log(detail)
+            playbackError = message
+            playbackLogger.error("Playback failed: \(detail, privacy: .private)")
         }
     }
 
@@ -135,18 +141,21 @@ final class CastApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     refreshIcon()
                     log("MyCast listening on port \(port)")
                 } catch {
-                    receiverFailed("SSDP 启动失败。\(error.localizedDescription)")
+                    receiverFailed("SSDP could not start. \(error.localizedDescription)",
+                                   "SSDP 启动失败。\(error.localizedDescription)")
                 }
             }
             server.failed = { [weak self, weak server] error in
                 guard let self, http === server else { return }
-                receiverFailed("HTTP 监听失败。\(error.localizedDescription)")
+                receiverFailed("The HTTP listener failed. \(error.localizedDescription)",
+                               "HTTP 监听失败。\(error.localizedDescription)")
             }
             http = server
             server.start()
             refreshIcon()
         } catch {
-            receiverFailed("HTTP 监听失败。\(error.localizedDescription)")
+            receiverFailed("The HTTP listener failed. \(error.localizedDescription)",
+                           "HTTP 监听失败。\(error.localizedDescription)")
         }
     }
 
@@ -161,7 +170,8 @@ final class CastApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshIcon()
     }
 
-    private func receiverFailed(_ message: String) {
+    private func receiverFailed(_ english: String, _ chinese: String) {
+        let message = settings.language.text(english, chinese)
         stopReceiver()
         log(message)
         if headless { exit(1) }
@@ -181,71 +191,86 @@ final class CastApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        let language = settings.language
         menu.removeAllItems()
         menu.addItem(item(settings.name))
         if let currentPort {
-            menu.addItem(item("DLNA 端口 \(currentPort)"))
+            menu.addItem(item(language.text("DLNA Port \(currentPort)", "DLNA 端口 \(currentPort)")))
             let endpoints = NSMenu()
             let addresses = ssdp?.interfaces ?? []
             for address in addresses {
-                endpoints.addItem(item("\(address.address):\(currentPort)（\(address.name)）", #selector(copyAddress(_:)),
-                                       data: "http://\(address.address):\(currentPort)"))
+                let endpoint = "\(address.address):\(currentPort)"
+                let title = language.text("\(endpoint) (\(address.name))", "\(endpoint)（\(address.name)）")
+                endpoints.addItem(item(title, #selector(copyAddress(_:)),
+                                       data: "http://\(endpoint)"))
             }
-            if addresses.isEmpty { endpoints.addItem(item("没有可用的局域网网卡")) }
-            let entry = item("局域网地址")
+            if addresses.isEmpty {
+                endpoints.addItem(item(language.text("No local network interfaces available", "没有可用的局域网网卡")))
+            }
+            let entry = item(language.text("Local Network Addresses", "局域网地址"))
             entry.isEnabled = true
             entry.submenu = endpoints
             menu.addItem(entry)
             if let ssdp {
                 let diagnostics = NSMenu()
                 if let search = ssdp.lastSearch, let time = ssdp.lastSearchTime {
-                    diagnostics.addItem(item("\(time.formatted(date: .omitted, time: .standard)) · \(search)"))
+                    diagnostics.addItem(item("\(time.formatted(date: .omitted, time: .standard)) · \(search.text(in: language))"))
                 } else {
-                    diagnostics.addItem(item("本次启动后尚未收到其他设备的 SSDP 搜索"))
+                    diagnostics.addItem(item(language.text("No SSDP searches received since startup", "本次启动后尚未收到其他设备的 SSDP 搜索")))
                 }
-                if let error = ssdp.lastError { diagnostics.addItem(item("最近一次错误 · \(error)")) }
-                diagnostics.addItem(item(dlna.lastAction ?? "本次启动后尚未收到播放控制指令"))
+                if let error = ssdp.lastError {
+                    diagnostics.addItem(item(language.text("Latest Error", "最近一次错误") + " · " + error.text(in: language)))
+                }
+                diagnostics.addItem(item(dlna.lastAction?.text(in: language) ??
+                    language.text("No playback commands received since startup", "本次启动后尚未收到播放控制指令")))
                 if let address = addresses.first {
-                    diagnostics.addItem(item("复制手机检测地址", #selector(copyAddress(_:)),
+                    diagnostics.addItem(item(language.text("Copy Phone Test Address", "复制手机检测地址"), #selector(copyAddress(_:)),
                                              data: "http://\(address.address):\(currentPort)/description.xml"))
                 }
-                let diagnosticItem = item("发现诊断")
+                let diagnosticItem = item(language.text("Discovery Diagnostics", "发现诊断"))
                 diagnosticItem.isEnabled = true
                 diagnosticItem.submenu = diagnostics
                 menu.addItem(diagnosticItem)
             }
         } else {
-            menu.addItem(item(http == nil ? "投屏接收已关闭" : "正在启动投屏服务…"))
+            menu.addItem(item(http == nil ? language.text("Receiver is off", "投屏接收已关闭") :
+                language.text("Starting receiver…", "正在启动投屏服务…")))
         }
         menu.addItem(.separator())
-        menu.addItem(item(http == nil ? "开始接收投屏" : "停止接收投屏", #selector(toggleReceiver)))
+        let receiverTitle = http == nil ? language.text("Start Receiver", "开始接收投屏") :
+            language.text("Stop Receiver", "停止接收投屏")
+        menu.addItem(item(receiverTitle, #selector(toggleReceiver)))
         if let media = playback.media {
             let mediaTitle = media.title.count > 48 ? String(media.title.prefix(48)) + "…" : media.title
             menu.addItem(item(mediaTitle))
-            if playbackError != nil { menu.addItem(item("查看播放错误…", #selector(showPlaybackError))) }
-            menu.addItem(item("复制媒体链接", #selector(copyMedia), key: "c"))
-            menu.addItem(item(playback.state == .playing || playback.state == .loading ? "暂停" : "播放", #selector(togglePlayback)))
-            menu.addItem(item("停止播放", #selector(stopPlayback)))
+            if playbackError != nil {
+                menu.addItem(item(language.text("Show Playback Error…", "查看播放错误…"), #selector(showPlaybackError)))
+            }
+            menu.addItem(item(language.text("Copy Media Link", "复制媒体链接"), #selector(copyMedia), key: "c"))
+            let playing = playback.state == .playing || playback.state == .loading
+            let playbackTitle = playing ? language.text("Pause", "暂停") : language.text("Play", "播放")
+            menu.addItem(item(playbackTitle, #selector(togglePlayback)))
+            menu.addItem(item(language.text("Stop Playback", "停止播放"), #selector(stopPlayback)))
         }
         menu.addItem(.separator())
         let players = NSMenu()
         for kind in PlayerKind.allCases {
-            let option = item(kind.title, #selector(selectPlayer(_:)), data: kind.rawValue)
+            let option = item(kind.title(in: language), #selector(selectPlayer(_:)), data: kind.rawValue)
             option.state = settings.player == kind ? .on : .off
             players.addItem(option)
         }
-        let player = item("播放器")
+        let player = item(language.text("Player", "播放器"))
         player.isEnabled = true
         player.submenu = players
         menu.addItem(player)
-        menu.addItem(item("设置…", #selector(preferences), key: ","))
-        menu.addItem(item("打开配置目录", #selector(openConfiguration)))
-        let login = item("登录时启动", #selector(toggleLogin))
+        menu.addItem(item(language.text("Settings…", "设置…"), #selector(preferences), key: ","))
+        menu.addItem(item(language.text("Open Configuration Folder", "打开配置目录"), #selector(openConfiguration)))
+        let login = item(language.text("Launch at Login", "登录时启动"), #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
         menu.addItem(.separator())
-        menu.addItem(item("帮助与原版项目", #selector(openHelp)))
-        menu.addItem(item("退出 MyCast", #selector(quit), key: "q"))
+        menu.addItem(item(language.text("Help and Original Project", "帮助与原版项目"), #selector(openHelp)))
+        menu.addItem(item(language.text("Quit MyCast", "退出 MyCast"), #selector(quit), key: "q"))
     }
 
     private func item(_ title: String, _ action: Selector? = nil, key: String = "", data: Any? = nil) -> NSMenuItem {
@@ -268,7 +293,7 @@ final class CastApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func stopPlayback() { playback.stop() }
 
     @objc private func showPlaybackError() {
-        if let playbackError { showError(playbackError) }
+        if let playbackError { showError(playbackError.text(in: settings.language)) }
     }
 
     @objc private func copyMedia() {
@@ -345,6 +370,7 @@ final class CastApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.alertStyle = .warning
         alert.messageText = "MyCast"
         alert.informativeText = message
+        alert.addButton(withTitle: settings.language.text("OK", "好"))
         alert.runModal()
     }
 }

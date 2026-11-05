@@ -17,6 +17,8 @@ open dist/MyCast.app
 
 把手机和 Mac 连到同一个局域网。打开 MyCast，在手机播放器的 **DLNA 投屏** 列表中选择 **MyCast（电脑名称）**。如果 macOS 弹出本地网络权限提示，允许后重新搜索。菜单栏可以暂停接收、查看监听端口、复制媒体链接和修改设备名。
 
+在菜单栏打开 **设置… → 语言**（英文界面为 **Settings… → Language**），选择 **简体中文** 或 **English** 后保存。MyCast 会记住语言选择，切换时无需重启接收服务。首次使用时优先匹配 macOS 的首选语言，无法匹配时显示英文。
+
 默认优先使用已安装的 mpv，没有 mpv 时使用 macOS 系统播放器。可以从菜单中切换到 **IINA** 或固定选用某个播放器。MyCast 会在 Homebrew、MacPorts 和 PATH 中查找 mpv，在系统及用户的 Applications 文件夹中查找 IINA。系统播放器的格式范围取决于 AVFoundation。需要 MKV 等更多格式时可以安装 mpv。使用 mpv 时，在菜单中打开配置目录，然后在其中的 `mpv` 目录放置 `mpv.conf` 或 `input.conf`。
 
 设备名、端口、网卡排除规则、音量、窗口大小、位置和置顶等设置会保存。端口设为 `0` 时由系统分配，实际端口显示在菜单栏。需要登录后自动运行时，将应用移动到 Applications 文件夹，再从菜单中启用 **登录时启动**。

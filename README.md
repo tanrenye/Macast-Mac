@@ -25,15 +25,17 @@ Use the menu bar icon to start or stop receiving casts, see the listening port, 
 
 ### Playback and settings
 
-In automatic mode, MyCast prefers mpv when available and falls back to the built-in macOS player. Use the player menu (**播放器**) to select IINA or choose a specific player. MyCast looks for mpv in its app bundle, in standard Homebrew and MacPorts locations, and on `PATH`. It looks for IINA in `/Applications` and `~/Applications`. The built-in player supports the formats AVFoundation can play. Install mpv for additional formats such as MKV.
+To change the interface language, open **Settings… → Language** (or **设置… → 语言**), select **English** or **简体中文**, and click **Save**. MyCast remembers your choice and applies it without restarting the receiver. Until you choose a language, MyCast uses the best match from your macOS language preferences, with English as the fallback.
 
-To customize mpv, select **Open Configuration Folder (打开配置目录)** and put `mpv.conf` or `input.conf` in the `mpv` subfolder.
+In automatic mode, MyCast prefers mpv when available and falls back to the built-in macOS player. Use the **Player** menu to select IINA or choose a specific player. MyCast looks for mpv in its app bundle, in standard Homebrew and MacPorts locations, and on `PATH`. It looks for IINA in `/Applications` and `~/Applications`. The built-in player supports the formats AVFoundation can play. Install mpv for additional formats such as MKV.
 
-MyCast saves settings such as the device name, port, network interface exclusions, volume, window size and position, and whether the player window stays on top. Set the port to `0` to let macOS assign one. Open the MyCast menu to see the active port. To launch MyCast automatically at login, move it to Applications and enable **Launch at Login (登录时启动)** from the menu.
+To customize mpv, select **Open Configuration Folder** and put `mpv.conf` or `input.conf` in the `mpv` subfolder.
+
+MyCast saves settings such as the device name, port, network interface exclusions, volume, window size and position, and whether the player window stays on top. Set the port to `0` to let macOS assign one. Open the MyCast menu to see the active port. To launch MyCast automatically at login, move it to Applications and enable **Launch at Login** from the menu.
 
 ### Troubleshoot discovery
 
-If your phone cannot find MyCast, choose **Discovery Diagnostics (发现诊断) → Copy Phone Test Address (复制手机检测地址)** and open the address in your phone's browser. If the device description XML loads, the phone can reach the receiver's HTTP port. Search again in the phone app and check the diagnostics menu to see whether MyCast received and answered the SSDP search.
+If your phone cannot find MyCast, choose **Discovery Diagnostics → Copy Phone Test Address** and open the address in your phone's browser. If the device description XML loads, the phone can reach the receiver's HTTP port. Search again in the phone app and check the diagnostics menu to see whether MyCast received and answered the SSDP search.
 
 You can check MyCast's local network permission in **System Settings → Privacy & Security → Local Network**. After rebuilding an ad hoc signed app, macOS may need to refresh its cached permission. If access is enabled but the SSDP diagnostics report “No route to host,” quit MyCast from the menu bar and reopen it.
 

@@ -48,7 +48,10 @@ final class MPVPlayer: PlayerBackend {
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.process === process else { return }
                 if process.terminationStatus == 0 && loaded { onEvent?(.ended) }
-                else { onEvent?(.error("播放器退出（\(process.terminationStatus)）。")) }
+                else {
+                    let status = process.terminationStatus
+                    onEvent?(.error(AppMessage("The player exited (status \(status)).", "播放器退出（\(status)）。")))
+                }
             }
         }
         try child.run()
@@ -117,7 +120,10 @@ final class MPVPlayer: PlayerBackend {
             }
             close(fd)
         }
-        guard remaining > 0 else { onEvent?(.error("无法连接播放器的 IPC。")); return }
+        guard remaining > 0 else {
+            onEvent?(.error(AppMessage("Could not connect to the player's IPC socket.", "无法连接播放器的 IPC。")))
+            return
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.connect(path: path, remaining: remaining - 1)
         }
@@ -135,7 +141,9 @@ final class MPVPlayer: PlayerBackend {
         let sent = packet.withUnsafeBytes { send(ipc, $0.baseAddress, $0.count, 0) }
         if sent != packet.count {
             // 避免在部分写入后发送下一条命令，导致 JSON 帧错位。
-            DispatchQueue.main.async { [weak self] in self?.onEvent?(.error("播放器控制连接中断。")) }
+            DispatchQueue.main.async { [weak self] in
+                self?.onEvent?(.error(AppMessage("The player control connection was interrupted.", "播放器控制连接中断。")))
+            }
         }
     }
 
@@ -152,7 +160,9 @@ final class MPVPlayer: PlayerBackend {
             if let message = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] { consume(message) }
             if ipc < 0 { return }
         }
-        if buffer.count > 1024 * 1024 { onEvent?(.error("播放器返回了过大的 IPC 消息。")) }
+        if buffer.count > 1024 * 1024 {
+            onEvent?(.error(AppMessage("The player's IPC message was too large.", "播放器返回了过大的 IPC 消息。")))
+        }
     }
 
     private func consume(_ message: [String: Any]) {
@@ -162,7 +172,9 @@ final class MPVPlayer: PlayerBackend {
             onEvent?(paused ? .paused : .playing)
         case "end-file":
             if message["reason"] as? String == "error" {
-                onEvent?(.error(message["file_error"] as? String ?? "媒体无法播放。"))
+                let detail = (message["file_error"] as? String).map { AppMessage($0) } ??
+                    AppMessage("The media could not be played.", "媒体无法播放。")
+                onEvent?(.error(detail))
             } else { onEvent?(.ended) }
         case "property-change":
             let value = message["data"] as? NSNumber
@@ -189,7 +201,7 @@ final class MPVPlayer: PlayerBackend {
                     // 启动阶段 path 可能还未设置，只有播放器空闲且无媒体时才报错。
                     DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
                         guard let self, !loaded, process != nil else { return }
-                        onEvent?(.error("播放器未能打开媒体。"))
+                        onEvent?(.error(AppMessage("The player could not open the media.", "播放器未能打开媒体。")))
                     }
                 }
             }

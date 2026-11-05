@@ -44,11 +44,11 @@ final class SSDP {
     private let targets: [String]
     private var senders: [CastInterface: Int32] = [:]
     var interfaces: [CastInterface] { senders.keys.sorted { $0.name < $1.name } }
-    private(set) var lastSearch: String?
+    private(set) var lastSearch: AppMessage?
     private(set) var lastSearchTime: Date?
-    private(set) var lastError: String? {
+    private(set) var lastError: AppMessage? {
         didSet {
-            if let lastError, lastError != oldValue { logger.error("\(lastError, privacy: .public)") }
+            if let lastError, lastError != oldValue { logger.error("\(lastError.english, privacy: .public)") }
         }
     }
     private var source: DispatchSourceRead?
@@ -136,7 +136,9 @@ final class SSDP {
                 senders[nic] = fd
                 added.append(nic)
             } catch {
-                lastError = "\(nic.name) 加入 SSDP 组播失败（\(error.localizedDescription)）"
+                let detail = error.localizedDescription
+                lastError = AppMessage("\(nic.name) could not join SSDP multicast (\(detail))",
+                                       "\(nic.name) 加入 SSDP 组播失败（\(detail)）")
             }
         }
         ticks += 1
@@ -176,12 +178,19 @@ final class SSDP {
             if remote { lastSearchTime = Date() }
             guard let nic = interfaces.filter({ (sender.sin_addr.s_addr & $0.mask) == ($0.ip & $0.mask) })
                     .max(by: { $0.mask.nonzeroBitCount < $1.mask.nonzeroBitCount }) else {
-                if remote { lastSearch = "收到 \(senderIP) 的搜索，但没有对应网段的 SSDP 网卡" }
+                if remote {
+                    lastSearch = AppMessage("Search from \(senderIP) has no SSDP interface on its subnet",
+                                            "收到 \(senderIP) 的搜索，但没有对应网段的 SSDP 网卡")
+                }
                 continue
             }
             let matches = st.lowercased() == "ssdp:all" ? targets : targets.filter { $0.lowercased() == st.lowercased() }
             guard !matches.isEmpty else {
-                if remote { lastSearch = "收到 \(senderIP) 的搜索，目标不匹配（\(String(st.prefix(80)))）" }
+                if remote {
+                    let target = st.prefix(80)
+                    lastSearch = AppMessage("Search from \(senderIP) did not match any target (\(target))",
+                                            "收到 \(senderIP) 的搜索，目标不匹配（\(target)）")
+                }
                 continue
             }
             guard pendingSearches < 128 else { continue }
@@ -201,7 +210,10 @@ final class SSDP {
                           "ST: \(target)", "USN: \(identity(target))"], to: destination, using: descriptor)
                     sent = sent || success
                 }
-                if remote { lastSearch = "\(senderIP) · \(sent ? "已回复搜索" : "回复搜索失败")" }
+                if remote {
+                    lastSearch = AppMessage("\(senderIP) · \(sent ? "Search answered" : "Search reply failed")",
+                                            "\(senderIP) · \(sent ? "已回复搜索" : "回复搜索失败")")
+                }
             }
         }
     }
@@ -263,7 +275,8 @@ final class SSDP {
             } }
         }
         if sent == bytes.count { return true }
-        lastError = "SSDP 发包失败（\(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO).localizedDescription)）"
+        let detail = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO).localizedDescription
+        lastError = AppMessage("Could not send SSDP packet (\(detail))", "SSDP 发包失败（\(detail)）")
         return false
     }
 
