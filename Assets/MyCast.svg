@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x2="0.82" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#306FF3"/>
+      <stop offset="1" stop-color="#1D3BA2"/>
+    </linearGradient>
+    <linearGradient id="edge" x2="0" y2="1">
+      <stop stop-color="#FFFFFF" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".06"/>
+    </linearGradient>
+  </defs>
+  <rect x="96" y="102" width="832" height="832" rx="188" fill="#15275B" opacity=".22"/>
+  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#tile)"/>
+  <rect x="98" y="98" width="828" height="828" rx="186" fill="none" stroke="url(#edge)" stroke-width="4"/>
+  <path d="M312 444V357a46 46 0 0 1 46-46h339a46 46 0 0 1 46 46v231a46 46 0 0 1-46 46H502"
+        fill="none" stroke="#FFFFFF" stroke-width="44" stroke-linecap="round"/>
+  <path d="M488 414q0-18 16-9l94 54q15 9 0 18l-94 54q-16 9-16-9z" fill="#FFFFFF"/>
+  <path d="M282 516a174 174 0 0 1 174 174M282 602a88 88 0 0 1 88 88"
+        fill="none" stroke="#B1F0FF" stroke-width="40" stroke-linecap="round"/>
+  <circle cx="282" cy="690" r="25" fill="#B1F0FF"/>
+</svg>
